@@ -1,11 +1,6 @@
-# This project will read an input image and automatically pixelate it and generate a new image.
-#
-# It accepts the following command line arguments:
-#   -o <output file>
-#   -c <number of colors>
-#   -s <pixel size>
-#   <input image>
+#!/usr/bin/env python3
 
+# This project will read an input image and automatically pixelate it and generate a new image.
 import argparse
 import os
 import cv2

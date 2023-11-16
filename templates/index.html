@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel Art</title>
+</head>
+
+<body>
+    {% for image in projects %}
+    <a href="/view/{{ image }}">
+        <h1>{{ image }}</h1>
+    </a>
+    {% endfor %}
+</body>
+
+</html>
