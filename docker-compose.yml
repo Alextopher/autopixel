@@ -2,6 +2,8 @@ services:
   web:
     build: .
     restart: unless-stopped
+    volumes:
+      - ./sketches:/app/sketches
     environment:
       VIRTUAL_HOST: pixel.mahoney.best
       LETSENCRYPT_HOST: pixel.mahoney.best
