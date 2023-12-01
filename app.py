@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse
+import time
 import cv2
 import numpy as np
 
@@ -10,13 +10,6 @@ from pixelate import pixelate
 
 app = Flask(__name__)
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="Pixelate an image.")
-parser.add_argument(
-    "-p", "--port", type=int, required=False, default=4444, help="Port to listen on"
-)
-
-args = parser.parse_args()
 
 # Upload images (in addition to an image it requires number of colors and pixel size)
 #
@@ -34,21 +27,31 @@ def upload():
 
     if not num_colors:
         return "Number of colors not specified", 400
-    
+
     if not pixel_size:
         return "Pixel size not specified", 400
 
     # Hash the image to get a unique filename
     filename = str(hash(file)) + "_" + num_colors + "_" + pixel_size
 
-    # read image as an numpy array 
-    image = np.asarray(bytearray(file.read()), dtype="uint8") 
+    # read image as an numpy array
+    image = np.asarray(bytearray(file.read()), dtype="uint8")
     image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-    
+
     cv2.imwrite(f"sketches/{filename}_original.png", image)
-      
+
+    # Track how long it takes to process the image
+    # Start timer
+    start = time.time()
+
     # # Process image
     javascript, output_image = pixelate(image, int(num_colors), int(pixel_size))
+
+    # End timer
+    end = time.time()
+
+    # Log the time it took to process the image
+    app.logger.info(f"Processed image in {end - start} seconds")
 
     # # Save javascript and output image to sketches directory
     with open(f"sketches/{filename}.js", "w") as f:
@@ -65,6 +68,7 @@ def upload():
 def index():
     return render_template("index.html")
 
+
 # Serve the viewer page
 @app.route("/view/<filename>")
 def view(filename):
@@ -76,11 +80,13 @@ def view(filename):
 def static_files(path):
     return send_from_directory("static", path)
 
+
 # Serve the output image from the sketches directory
 @app.route("/sketches/<path:path>")
 def sketches(path):
     return send_from_directory("sketches", path)
 
+
 # Run the app
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=args.port, debug=True)
+    app.run()

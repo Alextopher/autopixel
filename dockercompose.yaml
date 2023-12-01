@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      VIRTUAL_HOST: pixel.mahoney.best
+      LETSENCRYPT_HOST: pixel.mahoney.best
+
+networks:
+  default:
+    name: nginx
+    external: true

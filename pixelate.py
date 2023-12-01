@@ -5,13 +5,12 @@ import cv2
 import numpy as np
 from jinja2 import Template
 
+
 # debug shows an image at each step of the process
 def show_image(image: np.ndarray, name: str, scale=4):
     cv2.imshow(
         name,
-        cv2.resize(
-            image, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST
-        ),
+        cv2.resize(image, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST),
     )
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -231,6 +230,7 @@ def optimize_until_stable(program):
             return program
         size = new_size
 
+
 template_str = """/// THIS FILE WAS COMPUTER GENERATED
 function art() {
 {% for color in colors %}
@@ -261,6 +261,7 @@ function keyPressed() {
 }
 """
 
+
 # Creates the text of a p5.js program
 def create_javascript(colors, program, dim):
     template = Template(template_str)
@@ -272,11 +273,11 @@ def create_javascript(colors, program, dim):
 #
 # Returns a p5.js program that would draw the pixelated image and
 # the pixelated image itself
-def pixelate(input_image, num_colors, pixel_size, debug=False, verbose=False, optimize=True):
+def pixelate(
+    input_image, num_colors, pixel_size, debug=False, verbose=False, optimize=True
+):
     # Read input image
     (h, w) = input_image.shape[:2]
-
-    print(f"Processing image of size {w}x{h}...")
 
     # Shrink the image (pixelate it)
     scaled_image = downscale(input_image, pixel_size)
@@ -311,7 +312,11 @@ def pixelate(input_image, num_colors, pixel_size, debug=False, verbose=False, op
 
     # Scale the programs instructions back up to the original size
     program = [
-        [(x * pixel_size, y * pixel_size, w * pixel_size, h * pixel_size) for (x, y, w, h) in instructions] for instructions in program
+        [
+            (x * pixel_size, y * pixel_size, w * pixel_size, h * pixel_size)
+            for (x, y, w, h) in instructions
+        ]
+        for instructions in program
     ]
 
     # Optimize the program, joining adjacent rectangles
@@ -335,12 +340,13 @@ def pixelate(input_image, num_colors, pixel_size, debug=False, verbose=False, op
     # Create a new image, with the same size as the original
     output_image = np.full(input_image.shape, 0, np.uint8)
 
-    for (instructions, color) in zip(program, colors):
+    for instructions, color in zip(program, colors):
         # Draw each rectangle
-        for (x, y, w, h) in instructions:
+        for x, y, w, h in instructions:
             output_image[y : y + h, x : x + w] = color
 
-    return (javascript, output_image)    
+    return (javascript, output_image)
+
 
 if __name__ == "__main__":
     import argparse
@@ -348,7 +354,9 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Pixelate an image.")
-    parser.add_argument("-o", "--output", type=str, required=True, help="Output directory")
+    parser.add_argument(
+        "-o", "--output", type=str, required=True, help="Output directory"
+    )
     parser.add_argument(
         "-c", "--colors", type=int, required=False, help="Number of colors"
     )
@@ -358,9 +366,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
-    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
     parser.add_argument(
-        "--no-optimize", dest="optimize", action="store_false", help="Disable optimization"
+        "-d", "--debug", action="store_true", help="Enable debug output"
+    )
+    parser.add_argument(
+        "--no-optimize",
+        dest="optimize",
+        action="store_false",
+        help="Disable optimization",
     )
     parser.add_argument(
         "input_files", nargs="+", metavar="FILE", help="Input files to process"
@@ -371,12 +384,23 @@ if __name__ == "__main__":
     # Main program sequence!
     for image in args.input_files:
         input_image = cv2.imread(image)
-        (program, output_image) = pixelate(input_image, args.colors, args.size, debug=args.debug, verbose=args.verbose, optimize=args.optimize)
+        (program, output_image) = pixelate(
+            input_image,
+            args.colors,
+            args.size,
+            debug=args.debug,
+            verbose=args.verbose,
+            optimize=args.optimize,
+        )
 
         # Save the output image
         if args.output is not None:
-            cv2.imwrite(os.path.join(args.output, os.path.basename(image)), output_image)
+            cv2.imwrite(
+                os.path.join(args.output, os.path.basename(image)), output_image
+            )
 
             # Save the p5.js program
-            with open(os.path.join(args.output, os.path.basename(image)) + ".js", "w") as f:
+            with open(
+                os.path.join(args.output, os.path.basename(image)) + ".js", "w"
+            ) as f:
                 f.write(program)
