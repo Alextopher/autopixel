@@ -7,7 +7,7 @@ services:
     ports:
       - 4444:80
 
-networks:
-  default:
-    name: nginx
-    external: true
+# networks:
+#   default:
+#     name: nginx
+#     external: true
