@@ -1,13 +1,8 @@
 # Serve flask app from ubuntu
-FROM ubuntu:latest
-
-# Install python3 and pip3
-RUN apt-get update -y
-RUN apt-get install -y python3-pip python3-dev build-essential
+FROM jjanzic/docker-python3-opencv
 
 # Install dependencies
-RUN apt-get install python3-opencv
-RUN pip3 install flask numpy gunicorn
+RUN pip3 install flask gunicorn
 
 # Copy files
 WORKDIR /app
