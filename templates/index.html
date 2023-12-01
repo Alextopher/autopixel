@@ -4,14 +4,61 @@
 <head>
     <meta charset="UTF-8">
     <title>Pixel Art</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-    {% for image in projects %}
-    <a href="/view/{{ image }}">
-        <h1>{{ image }}</h1>
-    </a>
-    {% endfor %}
+    <h1>Auto Pixel Art</h1>
+
+    <p>It turns out computers are really good at repetitive tasks.</p>
+
+    <p>Upload an image and choose some parameters, and this site will generate a pixel art version of your image.</p>
+    <p>You can either download the resulting image as a PNG or as p5.js (open processing) code.</p>
+
+    <h3>Upload</h3>
+
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file" accept="image/*">
+        <br>
+        <br>
+        <label for="colors">Number of Colors:</label>
+        <br>
+        <input type="range" name="colors" id="colors" min="2" max="32" value="8">
+        <span id="colors-value">8</span>
+        <br>
+        <label for="size">Pixel Size:</label>
+        <br>
+        <input type="range" name="size" id="size" min="1" max="16" value="4">
+        <span id="size-value">4</span>
+        <br>
+        <br>
+        <input type="submit" value="Pixelate!">
+    </form>
+
+    <h3>Source Code</h3>
+    <a href="https://github.com/Alextopher/autopixel">https://github.com/Alextopher/autopixel</a>
+
+    <script>
+        const colorsSlider = document.getElementById("colors");
+        const sizeSlider = document.getElementById("size");
+
+        // Get the values
+        const colorsValue = document.getElementById("colors-value");
+        const sizeValue = document.getElementById("size-value");
+
+        // Set the initial values
+        colorsValue.innerHTML = colorsSlider.value;
+        sizeValue.innerHTML = sizeSlider.value;
+
+        // Update the values when the sliders change
+        colorsSlider.oninput = function () {
+            colorsValue.innerHTML = this.value;
+        }
+
+        sizeSlider.oninput = function () {
+            sizeValue.innerHTML = this.value;
+        }
+    </script>
 </body>
 
 </html>

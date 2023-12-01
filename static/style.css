@@ -1,0 +1,9 @@
+/* Supper basic dark theme */
+body {
+    background-color: #222;
+    color: #fff;
+}
+
+a {
+    color: #00ffff;
+}

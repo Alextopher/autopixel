@@ -1,45 +1,20 @@
 #!/usr/bin/env python3
 
 # This project will read an input image and automatically pixelate it and generate a new image.
-import argparse
-import os
 import cv2
 import numpy as np
-
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="Pixelate an image.")
-parser.add_argument("-o", "--output", type=str, required=False, help="Output directory")
-parser.add_argument(
-    "-c", "--colors", type=int, required=False, default=128, help="Number of colors"
-)
-parser.add_argument(
-    "-s", "--size", type=int, required=False, default=1, help="Pixel size"
-)
-parser.add_argument(
-    "-v", "--verbose", action="store_true", help="Enable verbose output"
-)
-parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
-parser.add_argument(
-    "--no-optimize", dest="optimize", action="store_false", help="Disable optimization"
-)
-parser.add_argument(
-    "input_files", nargs="+", metavar="FILE", help="Input files to process"
-)
-
-args = parser.parse_args()
-
+from jinja2 import Template
 
 # debug shows an image at each step of the process
-def debug(image: np.ndarray, name: str, scale=1):
-    if args.debug:
-        cv2.imshow(
-            name,
-            cv2.resize(
-                image, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST
-            ),
-        )
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+def show_image(image: np.ndarray, name: str, scale=4):
+    cv2.imshow(
+        name,
+        cv2.resize(
+            image, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST
+        ),
+    )
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 # Down samples the image by a factor of 'size'.
@@ -89,16 +64,24 @@ def reduce_colors(image: np.ndarray, num_colors: int):
     # Reshape the list of pixels back to a 2D array
     updated_image = updated_pixels.reshape(image.shape)
 
-    # In addition to trimming the number of colors, I also want to return the
-    # order of the colors, from most common to least common.
-    unique_pixels, counts = np.unique(updated_pixels, return_counts=True, axis=0)
-    sorted_colors = unique_pixels[np.argsort(-counts)]
+    return updated_image
 
-    # Later, I need to put the colors into a dictionary, but numpy arrays can't
-    # be keys in dictionaries, so I convert them to tuples.
-    sorted_colors = [tuple(color) for color in sorted_colors]
 
-    return (updated_image, sorted_colors)
+# Given an image, this function will count and sort the colors in the image.
+def count_colors(image: np.ndarray):
+    # Flatten the image, from a 2D array of pixels to a 1D array
+    pixels = image.reshape((image.shape[0] * image.shape[1], 3))
+
+    # Count the number of times each color appears
+    counts = np.unique(pixels, axis=0, return_counts=True)
+
+    # Sort the colors by how many times they appear
+    counts = sorted(zip(*counts), key=lambda x: x[1], reverse=True)
+
+    # Extract the colors from the counts
+    colors = [color for (color, _) in counts]
+
+    return colors
 
 
 # Pads an image so that each dimension is a power of 2.
@@ -124,7 +107,7 @@ def pad(image: np.ndarray, color):
 #
 # It takes the input image, and the order of colors to use, and returns a list
 # of rectangles to draw, for each color.
-def decompose(image: np.ndarray, colors: list):
+def decompose(image: np.ndarray, colors: list, debug=False):
     # assert that the image is square, and a power of 2 size
     assert image.shape[0] == image.shape[1]
     assert image.shape[0] & (image.shape[0] - 1) == 0
@@ -139,7 +122,7 @@ def decompose(image: np.ndarray, colors: list):
 
     # if debug mode is enabled I want to track the progress of the algorithm here
     final_image = None
-    if args.debug:
+    if debug:
         final_image = np.full(image.shape, colors[0], np.uint8)
 
     # Lists of rectangles to draw, for each color.
@@ -177,7 +160,7 @@ def decompose(image: np.ndarray, colors: list):
                 # Update the bitmask, marking all pixels that are this color as True
                 bitmask[y : y + h, x : x + w] = np.all(region == color, axis=-1)
 
-                if args.debug:
+                if debug:
                     final_image[y : y + h, x : x + w] = color
             else:
                 # Otherwise, split it into 4 quadrants and add them to the work list
@@ -188,8 +171,8 @@ def decompose(image: np.ndarray, colors: list):
 
         instructions.append(rectangles)
 
-        if args.debug:
-            debug(final_image, "Color: " + str(color))
+        if debug:
+            show_image(final_image, "Color: " + str(color))
 
     return instructions
 
@@ -233,125 +216,167 @@ def optimize(program):
     return optimized
 
 
-# Repeatidly preforms single-pass optimizations until the program stops changing.
+# Calculates the total length of a `program`.
+def program_size(program):
+    return sum([len(instructions) for instructions in program])
+
+
+# Repeatedly preforms single-pass optimizations until the program stops changing.
 def optimize_until_stable(program):
-    size = sum([len(instructions) for instructions in program])
+    size = program_size(program)
     while True:
         program = optimize(program)
-        new_size = sum([len(instructions) for instructions in program])
+        new_size = program_size(program)
         if new_size == size:
-            break
+            return program
         size = new_size
-    return program
+
+template_str = """/// THIS FILE WAS COMPUTER GENERATED
+function art() {
+{% for color in colors %}
+    fill({{ color[2] }}, {{ color[1] }}, {{ color[0] }});
+    {% for instruction in program[loop.index0] %}
+        rect({{ instruction[0] }}, {{ instruction[1] }}, {{ instruction[2] }}, {{ instruction[3] }});
+    {% endfor %}
+{% endfor %}
+}
+function setup() {
+    createCanvas({{ dim[0] }}, {{ dim[1] }});
+    background(0);
+    noStroke();
+    art();
+}
+
+var strokeState = false;
+function keyPressed() {
+    if (keyCode == BACKSPACE) {
+        strokeState = !strokeState;
+        if (strokeState) {
+            stroke(0, 0, 0);
+        } else {
+            noStroke();
+        }
+        art();
+    }
+}
+"""
+
+# Creates the text of a p5.js program
+def create_javascript(colors, program, dim):
+    template = Template(template_str)
+    rendered_output = template.render(colors=colors, program=program, dim=dim)
+    return rendered_output
 
 
-# Saves the program to a file
-def save(colors, program, dim, file):
-    file.write("/// THIS FILE WAS COMPUTER GENERATED\n")
-    file.write("function myDraw() {\n")
-    for i, color in enumerate(colors):
-        file.write("\tfill({0}, {1}, {2});\n".format(color[2], color[1], color[0]))
-        for instruction in program[i]:
-            file.write(
-                "\trect({0}, {1}, {2}, {3});\n".format(
-                    instruction[0], instruction[1], instruction[2], instruction[3]
-                )
-            )
-        file.write("\n")
-    file.write("}\n")
-
-    file.write("function setup() {\n")
-    file.write("\tcreateCanvas({0}, {1});\n".format(w, h))
-    file.write("\tbackground(0);\n")
-    file.write("\tnoStroke();\n")
-    file.write("\tmyDraw();\n")
-    file.write("}\n")
-
-    file.write("var strokeState = false;\n")
-    file.write("function keyPressed() {\n")
-    file.write("\tif (keyCode == BACKSPACE) {\n")
-    file.write("\t\tstrokeState = !strokeState;\n")
-    file.write("\t\tif (strokeState) {\n")
-    file.write("\t\t\tstroke(0, 0, 0);\n")
-    file.write("\t\t} else {\n")
-    file.write("\t\t\tnoStroke();\n")
-    file.write("\t\t}\n")
-    file.write("\t\tmyDraw();\n")
-    file.write("\t}\n")
-    file.write("}\n")
-
-
-# Main program sequence!
-for image in args.input_files:
-    # Add timing information
-    if args.verbose:
-        import time
-
-        start = time.time()
-
-    if args.verbose:
-        print(f"Processing {image}...")
-
+# Runs the entire pixelation process
+#
+# Returns a p5.js program that would draw the pixelated image and
+# the pixelated image itself
+def pixelate(input_image, num_colors, pixel_size, debug=False, verbose=False, optimize=True):
     # Read input image
-    input_image = cv2.imread(image)
     (h, w) = input_image.shape[:2]
 
+    print(f"Processing image of size {w}x{h}...")
+
     # Shrink the image (pixelate it)
-    scaled_image = downscale(input_image, args.size)
-    if args.debug:
-        debug(scaled_image, "Scaled")
+    scaled_image = downscale(input_image, pixel_size)
+    if debug:
+        show_image(scaled_image, "Scaled")
 
     # Chooses best-fit colors
-    (reduced, colors) = reduce_colors(scaled_image, args.colors)
-    if args.debug:
-        debug(reduced, "Reduced")
+    if num_colors is not None:
+        if verbose:
+            print(f"Reducing colors to {num_colors}...")
+
+        reduced = reduce_colors(scaled_image, num_colors)
+        if debug:
+            show_image(reduced, "Reduced")
+    else:
+        if verbose:
+            print("Skipping color reduction...")
+
+        reduced = scaled_image
+
+    # Sorts the occurrences of colors in the image
+    colors = count_colors(reduced)
 
     # Makes the image a square, with power of 2 sides.
     padded_image = pad(reduced, colors[0])
 
-    if args.debug:
-        debug(padded_image, "Padded")
+    if debug:
+        show_image(padded_image, "Padded")
 
     # Decompose the image for each color
     program = decompose(padded_image, colors)
 
     # Scale the programs instructions back up to the original size
-    def scale(instruction):
-        (x, y, w, h) = instruction
-        return (x * args.size, y * args.size, w * args.size, h * args.size)
-
     program = [
-        [scale(instruction) for instruction in instructions] for instructions in program
+        [(x * pixel_size, y * pixel_size, w * pixel_size, h * pixel_size) for (x, y, w, h) in instructions] for instructions in program
     ]
 
-    if args.verbose:
-        # Print the original program size before optimizing
-        print(
-            f"Original program size: {sum([len(instructions) for instructions in program])}"
-        )
-
     # Optimize the program, joining adjacent rectangles
-    if args.optimize:
-        program = optimize(program)
+    if optimize:
+        # Print the original program size before optimizing
+        if verbose:
+            print(
+                f"Original program size: {sum([len(instructions) for instructions in program])}"
+            )
 
-        if args.verbose:
+        program = optimize_until_stable(program)
+
+        if verbose:
             # Print the optimized program size
             print(
                 f"Optimized program size: {sum([len(instructions) for instructions in program])}"
             )
 
-    # Now we output the instructions to a js file
-    if not os.path.exists(args.output):
-        os.makedirs(args.output)
+    javascript = create_javascript(colors, program, (w, h))
 
-    output_file = os.path.join(args.output, os.path.basename(image) + ".js")
+    # Create a new image, with the same size as the original
+    output_image = np.full(input_image.shape, 0, np.uint8)
 
-    if args.verbose:
-        print(f"Writing to {output_file}...")
+    for (instructions, color) in zip(program, colors):
+        # Draw each rectangle
+        for (x, y, w, h) in instructions:
+            output_image[y : y + h, x : x + w] = color
 
-    with open(output_file, "w") as file:
-        save(colors, program, (w, h), file)
+    return (javascript, output_image)    
 
-    if args.verbose:
-        end = time.time()
-        print(f"Done in {round(end - start, 2)} seconds.")
+if __name__ == "__main__":
+    import argparse
+    import os
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Pixelate an image.")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output directory")
+    parser.add_argument(
+        "-c", "--colors", type=int, required=False, help="Number of colors"
+    )
+    parser.add_argument(
+        "-s", "--size", type=int, required=False, default=1, help="Pixel size"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose output"
+    )
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
+    parser.add_argument(
+        "--no-optimize", dest="optimize", action="store_false", help="Disable optimization"
+    )
+    parser.add_argument(
+        "input_files", nargs="+", metavar="FILE", help="Input files to process"
+    )
+
+    args = parser.parse_args()
+
+    # Main program sequence!
+    for image in args.input_files:
+        input_image = cv2.imread(image)
+        (program, output_image) = pixelate(input_image, args.colors, args.size, debug=args.debug, verbose=args.verbose, optimize=args.optimize)
+
+        # Save the output image
+        if args.output is not None:
+            cv2.imwrite(os.path.join(args.output, os.path.basename(image)), output_image)
+
+            # Save the p5.js program
+            with open(os.path.join(args.output, os.path.basename(image)) + ".js", "w") as f:
+                f.write(program)

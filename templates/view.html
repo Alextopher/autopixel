@@ -5,11 +5,17 @@
     <meta charset="UTF-8">
     <title>Pixel Art</title>
     <script src="/static/p5.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-    <h1>{{ title }}</h1>
-    <script src="/sketches/{{title}}.js"></script>
+    <!-- {{filename + ".js"}} -->
+    <!-- Download button for the image and the javascript -->
+    <a href="/sketches/{{filename}}.png" download="{{filename}}.png">Download Image</a>
+    <a href="/sketches/{{filename}}.js" download="{{filename}}.js">Download Javascript</a>
+
+    <!-- Show the javascript -->
+    <script src="/sketches/{{filename}}.js"></script>
 </body>
 
 </html>
