@@ -4,9 +4,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./sketches:/app/sketches
-    environment:
-      VIRTUAL_HOST: pixel.mahoney.best
-      LETSENCRYPT_HOST: pixel.mahoney.best
+    ports:
+      - 4444:80
 
 networks:
   default:
