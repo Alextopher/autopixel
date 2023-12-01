@@ -10,4 +10,4 @@ WORKDIR /app
 COPY . /app
 
 # Run with gunicorn
-CMD ["gunicorn", "-w 2", "--bind", "0.0.0.0:80", "app:app"]
+CMD ["gunicorn", "-w 5", "--bind", "0.0.0.0:80", "app:app"]
