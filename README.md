@@ -42,7 +42,7 @@ options:
   -v, --verbose         Enable verbose output
   -d, --debug           Enable debug output
   --no-optimize         Disable optimization
-  ```
+```
 
 ## Flask App
 
